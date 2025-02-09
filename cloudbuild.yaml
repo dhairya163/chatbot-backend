@@ -22,7 +22,7 @@ steps:
     - 'managed'
     - '--allow-unauthenticated'
     - '--set-secrets'
-    - 'MONGODB_URL=MONGODB_URL:latest'
+    - 'MONGODB_URL=MONGODB_URL:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/chatbot-api' 

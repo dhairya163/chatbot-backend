@@ -1,0 +1,2 @@
+2025-02-10 01:29:21,886 - chatbot - ERROR - Error processing message: 'dict' object has no attribute 'secondary_description'
+2025-02-10 01:30:32,032 - chatbot - ERROR - Error processing message: 'async for' requires an object with __aiter__ method, got ChatCompletion

@@ -1,8 +1,13 @@
 import uuid
-from typing import AsyncGenerator, Tuple, Optional
+from typing import AsyncGenerator, Tuple, Optional, List
 from fastapi import HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from app.core.config import settings
+from openai import AsyncOpenAI
+from app.core.logger import logger
+from app.core.constants import NO_BOT_DESCRIPTION, SYSTEM_MESSAGE_TEMPLATE, THIS_MESSAGE_WAS_DELETED
 
+from app.crud.bot_info import BotInfoCRUD
 from app.crud.chat import ChatCRUD
 from app.models.conversation import Message, MessageType, BotConversation
 from app.schemas.chat import (
@@ -17,7 +22,9 @@ from app.schemas.chat import (
 
 class ChatService:
     def __init__(self, db: AsyncIOMotorDatabase):
+        self.bot_info_curd = BotInfoCRUD(db)
         self.crud = ChatCRUD(db)
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
     async def get_chat_history(self, chat_id: str, bot_id: str) -> ChatHistory:
         conversation = await self.crud.get_chat_history(chat_id, bot_id)
@@ -79,6 +86,33 @@ class ChatService:
             ]
         )
 
+    def _build_message_history(self, conversation: BotConversation) -> List[dict]:
+        messages = []
+        for msg in conversation.messages:
+            if msg.is_deleted:
+                messages.append({"role": msg.type, "content": THIS_MESSAGE_WAS_DELETED})
+            role = "assistant" if msg.type == MessageType.ASSISTANT else "user"
+            messages.append({"role": role, "content": msg.message})
+        return messages
+    
+    async def create_system_message(self, bot_id: str) -> str:
+        bot_info = await self.bot_info_curd.get_bot_by_id(bot_id=bot_id)
+        return SYSTEM_MESSAGE_TEMPLATE.format(bot_description=bot_info.get("secondary_description", NO_BOT_DESCRIPTION))
+
+    async def call_openai(self, conversation: BotConversation, user_message: str) -> AsyncGenerator:
+        messages = []
+        messages.append({
+            "role": "system", 
+            "content": await self.create_system_message(conversation.bot_id)
+        })
+        messages.extend(self._build_message_history(conversation))
+        messages.append({"role": "user", "content": user_message})
+        return await self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            stream=True
+        )
+
     async def process_message(
         self,
         message_data: MessageCreate,
@@ -120,20 +154,34 @@ class ChatService:
         )
         yield "user_message", user_response.dict()
 
-        # TODO: Replace this with actual chat processing logic
-        response_text = f"Echo: {message_data.message}"
+        # Stream the chat completion
         buffer = ""
+        try:
+            stream = await self.call_openai(conversation, message_data.message)
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    delta = chunk.choices[0].delta.content
+                    buffer += delta
+                    stream_response = StreamResponse(
+                        message_id=assistant_message_id,
+                        delta=delta,
+                        buffer=buffer
+                    )
+                    yield "assistant_message", stream_response.dict()
 
-        # Stream assistant response
-        for char in response_text:
-            buffer += char
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+            
+            # If an error occurs, yield an assistant message with a failure notice
+            error_message = "AI call failed"
             stream_response = StreamResponse(
                 message_id=assistant_message_id,
-                delta=char,
-                buffer=buffer
+                delta=error_message,
+                buffer=buffer + error_message
             )
             yield "assistant_message", stream_response.dict()
-
+            
         # Update assistant message with complete response
         assistant_message.message = buffer
 

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # MongoDB
     MONGODB_URL: str
     MONGODB_DB_NAME: str = "chatbot_db"
+    OPENAI_API_KEY: str
     
     class Config:
         env_file = ".env"
