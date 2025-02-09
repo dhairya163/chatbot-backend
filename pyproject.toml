@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "chatbot-be"
+version = "0.1.0"
+description = "Chatbot backend with FastAPI and MongoDB"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "chatbot_be"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.8"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+motor = "^3.7.0"
+pydantic = "^2.10.6"
+python-dotenv = "^1.0.1"
+pydantic-settings = "^2.7.1"
+passlib = "^1.7.4"
+bcrypt = "^4.2.1"
+sse-starlette = "^2.2.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
