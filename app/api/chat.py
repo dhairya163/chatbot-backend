@@ -24,8 +24,7 @@ async def get_chat_history(
     bot_id: str,
     db=Depends(get_database)
 ) -> ChatHistory:
-    crud = ChatCRUD(db)
-    service = ChatService(crud)
+    service = ChatService(db)
     return await service.get_chat_history(chat_id, bot_id)
 
 @router.put("/message")
@@ -33,8 +32,7 @@ async def edit_message(
     edit_data: MessageEdit,
     db=Depends(get_database)
 ) -> ChatHistory:
-    crud = ChatCRUD(db)
-    service = ChatService(crud)
+    service = ChatService(db)
     return await service.edit_message(edit_data)
 
 @router.post("/sse")
@@ -44,8 +42,7 @@ async def chat_endpoint(
     db=Depends(get_database)
 ):
     async def event_generator():
-        crud = ChatCRUD(db)
-        service = ChatService(crud)
+        service = ChatService(db)
         
         async for event_type, data in service.process_message(message_data):
             if await request.is_disconnected():

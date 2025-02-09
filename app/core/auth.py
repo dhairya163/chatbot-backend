@@ -1,7 +1,10 @@
 from functools import wraps
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Depends
 from passlib.context import CryptContext
-from app.crud import bot_info as bot_crud
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from app.crud.bot_info import BotInfoCRUD
+from app.database.mongodb import get_database
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -14,11 +17,12 @@ def get_password_hash(password: str) -> str:
 def require_admin_auth(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        # Extract request and bot_id directly from kwargs
+        # Extract request, bot_id and db from kwargs
         request = kwargs.get('request')
         bot_id = kwargs.get('bot_id')
+        db = kwargs.get('db')
 
-        if not request:
+        if not request or db is None:
             raise HTTPException(status_code=500, detail="Internal server error")
 
         admin_password = request.headers.get('admin-password')
@@ -28,7 +32,8 @@ def require_admin_auth(func):
 
         if bot_id:
             # For update operations, verify against existing password
-            bot_info = await bot_crud.get_bot_by_id(bot_id)
+            crud = BotInfoCRUD(db)
+            bot_info = await crud.get_bot_by_id(bot_id)
             if not bot_info or not verify_password(admin_password, bot_info.get('admin_password', '')):
                 raise HTTPException(status_code=401, detail="Invalid admin password")
 

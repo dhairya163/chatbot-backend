@@ -1,6 +1,7 @@
 import uuid
 from typing import AsyncGenerator, Tuple, Optional
 from fastapi import HTTPException
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.crud.chat import ChatCRUD
 from app.models.conversation import Message, MessageType, BotConversation
@@ -15,8 +16,8 @@ from app.schemas.chat import (
 )
 
 class ChatService:
-    def __init__(self, crud: ChatCRUD):
-        self.crud = crud
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.crud = ChatCRUD(db)
 
     async def get_chat_history(self, chat_id: str, bot_id: str) -> ChatHistory:
         conversation = await self.crud.get_chat_history(chat_id, bot_id)
